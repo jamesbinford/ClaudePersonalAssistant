@@ -17,3 +17,6 @@ wheels/
 .vscode/
 *.swp
 *.swo
+
+# Logs
+logs/

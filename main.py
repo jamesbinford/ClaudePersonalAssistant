@@ -15,7 +15,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from claude_agent_sdk import (
-    query,
+    ClaudeSDKClient,
     ClaudeAgentOptions,
     tool,
     create_sdk_mcp_server,
@@ -109,10 +109,11 @@ Your job is to:
    - Find all tasks that are due within the next 5 days (from today: {today})
    - Note the task name, due date, and any relevant details
 
-2. **Check Dex CRM Keep In Touch List**:
-   - Search the Dex CRM for contacts that need attention
-   - Look for contacts in the "Keep In Touch" list or those with upcoming reminders
-   - Note contact names and any relevant context about why to reach out
+2. **Check Dex CRM for Contacts Needing Follow-up**:
+   - Search Dex CRM for contacts with notes containing: "follow up", "reach out", "connect", "check in", "catch up", "schedule", "meeting"
+   - Also search for contacts with active reminders
+   - For each relevant contact found, get their details and any recent notes
+   - Note contact names, their context, and why they might need attention
 
 3. **Send a Reminder Email**:
    - Compose a nicely formatted HTML email summarizing:
@@ -149,25 +150,29 @@ async def run_assistant() -> None:
             "mcp__dex__get_contact_reminders",
         ],
         permission_mode="bypassPermissions",
+        setting_sources=["user", "project", "local"],
     )
 
     prompt = get_agent_prompt()
 
     try:
-        async for message in query(prompt=prompt, options=options):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        print(f"\n{block.text}")
-            elif isinstance(message, ResultMessage):
-                print("\n" + "-" * 50)
-                if message.is_error:
-                    print(f"Agent completed with error")
-                else:
-                    print(f"Agent completed successfully")
-                print(f"Duration: {message.duration_ms / 1000:.2f}s")
-                if message.total_cost_usd:
-                    print(f"Cost: ${message.total_cost_usd:.4f}")
+        async with ClaudeSDKClient(options=options) as client:
+            await client.query(prompt)
+
+            async for message in client.receive_response():
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            print(f"\n{block.text}")
+                elif isinstance(message, ResultMessage):
+                    print("\n" + "-" * 50)
+                    if message.is_error:
+                        print("Agent completed with error")
+                    else:
+                        print("Agent completed successfully")
+                    print(f"Duration: {message.duration_ms / 1000:.2f}s")
+                    if message.total_cost_usd:
+                        print(f"Cost: ${message.total_cost_usd:.4f}")
     except Exception as e:
         print(f"\nError running assistant: {e}")
         raise
