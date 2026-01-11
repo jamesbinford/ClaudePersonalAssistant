@@ -39,17 +39,17 @@ load_dotenv()
 async def send_email(args: dict[str, Any]) -> dict[str, Any]:
     """Send an email using SMTP configuration from environment variables."""
     smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    from_email = os.getenv("FROM_EMAIL", smtp_user)
+    smtp_port = int(os.getenv("SMTP_PORT", "1025"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    from_email = os.getenv("FROM_EMAIL") or smtp_user or "assistant@localhost"
 
-    if not all([smtp_host, smtp_user, smtp_password]):
+    if not smtp_host:
         return {
             "content": [
                 {
                     "type": "text",
-                    "text": "Error: SMTP configuration incomplete. Please set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD environment variables.",
+                    "text": "Error: SMTP_HOST is required. Set it to 'localhost' for Mailpit or 'smtp.gmail.com' for Gmail.",
                 }
             ],
             "is_error": True,
@@ -69,8 +69,10 @@ async def send_email(args: dict[str, Any]) -> dict[str, Any]:
         msg.attach(html_part)
 
         with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
+            # Only use TLS and auth if credentials are provided (not needed for local Mailpit)
+            if smtp_user and smtp_password:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
             server.sendmail(from_email, to_email, msg.as_string())
 
         return {
