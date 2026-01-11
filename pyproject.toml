@@ -1,0 +1,13 @@
+[project]
+name = "claude-personal-assistant"
+version = "0.1.0"
+description = "A personal assistant agent that checks Notion ToDo lists, Dex CRM contacts, and sends reminder emails"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "claude-agent-sdk>=0.1.19",
+    "python-dotenv>=1.2.1",
+]
+
+[project.scripts]
+assistant = "main:main"
