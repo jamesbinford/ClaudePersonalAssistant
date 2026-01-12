@@ -10,7 +10,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from dotenv import load_dotenv
@@ -96,11 +96,16 @@ def get_agent_prompt() -> str:
     if not recipient_email:
         raise ValueError("RECIPIENT_EMAIL environment variable is required")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    current_month = now.strftime("%B")  # e.g., "January"
+    next_month = (now.replace(day=28) + timedelta(days=4)).strftime("%B")  # e.g., "February"
 
     return f"""You are a personal assistant helping the user stay on top of their tasks and relationships.
 
 Today's date is: {today}
+Current month: {current_month}
+Next month: {next_month}
 
 Your job is to:
 
@@ -110,10 +115,13 @@ Your job is to:
    - Note the task name, due date, and any relevant details
 
 2. **Check Dex CRM for Contacts Needing Follow-up**:
-   - Search Dex CRM for contacts with notes containing: "follow up", "reach out", "connect", "check in", "catch up", "schedule", "meeting"
+   - Search Dex CRM for contacts with notes containing keywords: "follow up", "reach out", "connect", "check in", "catch up", "schedule", "meeting"
+   - **IMPORTANT**: Also search for notes mentioning the current month ({current_month}) or next month ({next_month}) - these indicate time-sensitive follow-ups (e.g., "Reach out to X in {current_month}")
+   - Search for month names: "{current_month}", "{next_month}"
    - Also search for contacts with active reminders
    - For each relevant contact found, get their details and any recent notes
-   - Note contact names, their context, and why they might need attention
+   - Pay special attention to date-related context in notes (e.g., "follow up in February", "reconnect after the holidays")
+   - Note contact names, their context, and why/when they need attention
 
 3. **Send a Reminder Email**:
    - Compose a nicely formatted HTML email summarizing:
