@@ -7,7 +7,9 @@ services:
       - "1025:1025"   # SMTP server
       - "8025:8025"   # Web UI
     environment:
-      # Relay settings - uncomment and configure to actually send emails
+      # Verbose logging
+      - MP_VERBOSE=true
+      # Relay settings
       - MP_SMTP_RELAY_HOST=${RELAY_HOST:-}
       - MP_SMTP_RELAY_PORT=${RELAY_PORT:-587}
       - MP_SMTP_RELAY_STARTTLS=true
