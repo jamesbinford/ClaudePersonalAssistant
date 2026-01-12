@@ -1,8 +1,9 @@
 """
 ClaudePersonalAssistant - A personal assistant agent that:
-1. Checks your Notion ToDo list for items due within 5 days
-2. Checks your Dex CRM for contacts in your Keep In Touch list
-3. Sends a nicely formatted reminder email via SMTP
+1. Checks your Google Calendar for upcoming events
+2. Checks your Notion ToDo list for items due within 5 days
+3. Checks your Dex CRM for contacts in your Keep In Touch list
+4. Sends a nicely formatted reminder email via SMTP
 """
 
 import asyncio
@@ -14,6 +15,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from dotenv import load_dotenv
+
+from calendar_integration import get_upcoming_events, format_events_for_prompt
 from claude_agent_sdk import (
     ClaudeSDKClient,
     ClaudeAgentOptions,
@@ -90,7 +93,7 @@ async def send_email(args: dict[str, Any]) -> dict[str, Any]:
         }
 
 
-def get_agent_prompt() -> str:
+def get_agent_prompt(calendar_events: str = "") -> str:
     """Generate the prompt for the personal assistant agent."""
     recipient_email = os.getenv("RECIPIENT_EMAIL")
     if not recipient_email:
@@ -101,11 +104,20 @@ def get_agent_prompt() -> str:
     current_month = now.strftime("%B")  # e.g., "January"
     next_month = (now.replace(day=28) + timedelta(days=4)).strftime("%B")  # e.g., "February"
 
+    calendar_section = f"""
+## CALENDAR EVENTS (Next 5 Days)
+{calendar_events}
+""" if calendar_events else """
+## CALENDAR EVENTS
+Calendar not configured or no events found.
+"""
+
     return f"""You are a personal assistant helping the user stay on top of their tasks and relationships.
 
 Today's date is: {today}
 Current month: {current_month}
 Next month: {next_month}
+{calendar_section}
 
 Your job is to:
 
@@ -125,13 +137,14 @@ Your job is to:
 
 3. **Send a Reminder Email**:
    - Compose a nicely formatted HTML email summarizing:
+     - **Calendar events** for the next 5 days (provided above)
      - Upcoming tasks from Notion (organized by due date)
      - Contacts to reach out to from Dex CRM
    - Send the email to: {recipient_email}
    - Use a clear, professional format with sections and bullet points
    - Subject line should include today's date
 
-Start by searching Notion for the ToDo database, then check Dex CRM, and finally compose and send the email.
+Start by searching Notion for the ToDo database, then check Dex CRM, and finally compose and send the email (including the calendar events provided above).
 
 If you encounter any issues accessing Notion or Dex, include what information you were able to gather and note what couldn't be accessed."""
 
@@ -142,12 +155,19 @@ async def run_assistant() -> None:
     print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 50)
 
+    # Fetch calendar events
+    print("Fetching calendar events...")
+    calendar_events = get_upcoming_events(days=5)
+    calendar_text = format_events_for_prompt(calendar_events)
+    print(f"Found {len(calendar_events)} calendar events")
+    print("-" * 50)
+
     email_server = create_sdk_mcp_server(
         name="email", version="1.0.0", tools=[send_email]
     )
 
     options = ClaudeAgentOptions(
-        system_prompt="You are a helpful personal assistant that checks tasks and contacts, then sends reminder emails.",
+        system_prompt="You are a helpful personal assistant that checks calendar, tasks and contacts, then sends reminder emails.",
         mcp_servers={"email": email_server},
         allowed_tools=[
             "mcp__email__send_email",
@@ -161,7 +181,7 @@ async def run_assistant() -> None:
         setting_sources=["user", "project", "local"],
     )
 
-    prompt = get_agent_prompt()
+    prompt = get_agent_prompt(calendar_events=calendar_text)
 
     try:
         async with ClaudeSDKClient(options=options) as client:

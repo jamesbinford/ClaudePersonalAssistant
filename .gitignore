@@ -20,3 +20,7 @@ wheels/
 
 # Logs
 logs/
+
+# Google Calendar credentials (contain secrets)
+credentials.json
+token.json
